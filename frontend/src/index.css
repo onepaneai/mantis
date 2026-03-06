@@ -1,0 +1,694 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap');
+
+:root {
+  /* Primary Foundation (Light Theme) */
+  --bg-void: #F8FAFC;
+  --surface-dark: #FFFFFF;
+  --surface-elevated: #F1F5F9;
+  --border-card: #E2E8F0;
+  --border-hover: #CBD5E1;
+
+  /* Accent Colors (Darker for readability on light BG) */
+  --neon-mantis: #10B981;
+  --neon-blue: #3B82F6;
+  --neon-red: #EF4444;
+  --neon-amber: #F59E0B;
+  --neon-lime: #84CC16;
+
+  /* Text Colors */
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+
+  /* Theme Text Accents */
+  --text-accent-green: #39FF85;
+
+  /* Typography */
+  --font-logo: 'Space Grotesk', sans-serif;
+  --font-heading: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-void);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+}
+
+/* Typography */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.page-title {
+  font-size: 26px;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+
+.big-number {
+  font-family: var(--font-mono);
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+/* Main Layout Shell */
+.app-shell {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 260px;
+  background-color: var(--bg-void);
+  border-right: 1px solid var(--border-card);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
+  z-index: 10;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  position: relative;
+  background: radial-gradient(circle at top right, rgba(57, 255, 133, 0.03), transparent 50%),
+    radial-gradient(circle at bottom left, rgba(255, 56, 96, 0.03), transparent 50%);
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 32px;
+  width: 100%;
+}
+
+/* Minimalist Card System */
+.card {
+  background: var(--surface-dark);
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: none;
+  transition: border-color 150ms ease;
+  position: relative;
+  overflow: hidden;
+  animation: fadeUp 0.4s ease forwards;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card:hover {
+  border-color: var(--border-hover);
+}
+
+.card-title {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Standard Status Card Borders */
+.card-success {
+  border-left: 3px solid var(--neon-mantis);
+}
+
+.card-fail {
+  border-left: 3px solid var(--neon-red);
+}
+
+.card-warning {
+  border-left: 3px solid var(--neon-amber);
+}
+
+/* Minimalist Stat Cards */
+.glow-card {
+  border-radius: 8px;
+  background: var(--surface-dark);
+  border: 1px solid var(--border-card);
+  box-shadow: none;
+}
+
+.glow-card-pass {
+  border-bottom: 3px solid var(--neon-mantis);
+}
+
+.glow-card-fail {
+  border-bottom: 3px solid var(--neon-red);
+}
+
+.glow-card-info {
+  border-bottom: 3px solid var(--neon-blue);
+}
+
+.glow-card-warning {
+  border-bottom: 3px solid var(--neon-amber);
+}
+
+/* Button System */
+button {
+  padding: 8px 16px;
+  background: var(--text-primary);
+  color: var(--bg-void);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  transition: all 150ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: none;
+}
+
+button:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: none;
+  box-shadow: none;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+button:disabled {
+  background: var(--surface-elevated);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--neon-mantis);
+  border: 1px solid var(--border-hover);
+}
+
+button.secondary:hover:not(:disabled) {
+  background: rgba(57, 255, 133, 0.1);
+  border-color: rgba(57, 255, 133, 0.3);
+  box-shadow: none;
+}
+
+button.danger {
+  background: var(--neon-red);
+  color: #fff;
+}
+
+button.danger:hover:not(:disabled) {
+  background: #E0264B;
+  box-shadow: 0 4px 12px rgba(255, 56, 96, 0.3);
+}
+
+button.icon-btn {
+  padding: 6px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+button.icon-btn:hover {
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+}
+
+button.icon-btn.danger-hover:hover {
+  background: rgba(255, 56, 96, 0.1);
+  color: var(--neon-red);
+}
+
+/* Forms and Inputs */
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: var(--font-body);
+  background: var(--bg-void);
+  color: var(--text-primary);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--neon-mantis);
+  box-shadow: 0 0 0 1px var(--neon-mantis);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Status Pills */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid transparent;
+}
+
+.pill.pass {
+  background: rgba(57, 255, 133, 0.1);
+  color: var(--neon-mantis);
+  border-color: rgba(57, 255, 133, 0.2);
+}
+
+.pill.fail {
+  background: rgba(255, 56, 96, 0.1);
+  color: var(--neon-red);
+  border-color: rgba(255, 56, 96, 0.2);
+}
+
+.pill.running {
+  background: rgba(56, 189, 248, 0.1);
+  color: var(--neon-blue);
+  border-color: rgba(56, 189, 248, 0.2);
+}
+
+.pill.pending {
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  border-color: var(--border-card);
+}
+
+.pill.warning {
+  background: rgba(255, 190, 11, 0.1);
+  color: var(--neon-amber);
+  border-color: rgba(255, 190, 11, 0.2);
+}
+
+/* Layout Utilities */
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flex-gap {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.grid {
+  display: grid;
+  gap: 24px;
+}
+
+.grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* Execution & Code Blocks */
+.execution-row {
+  border-left: 1px solid var(--border-card);
+  padding-left: 16px;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.execution-row::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-card);
+}
+
+.execution-row:last-child {
+  margin-bottom: 0;
+}
+
+pre,
+.code-block {
+  background: var(--bg-void);
+  color: var(--text-secondary);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+pre::-webkit-scrollbar {
+  height: 6px;
+}
+
+pre::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 3px;
+}
+
+/* Custom Sidebar Item */
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-left: 2px solid transparent;
+}
+
+.sidebar-item:hover {
+  background: var(--surface-dark);
+  color: var(--text-primary);
+}
+
+.sidebar-item.active.testing {
+  border-left-color: var(--neon-mantis);
+  background: rgba(57, 255, 133, 0.05);
+  color: var(--neon-mantis);
+}
+
+.sidebar-item.active.security {
+  border-left-color: var(--neon-red);
+  background: rgba(255, 56, 96, 0.05);
+  color: var(--neon-red);
+}
+
+/* Recharts Overrides for Tooltip */
+.recharts-tooltip-wrapper {
+  z-index: 100;
+}
+
+.custom-tooltip {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-hover);
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+@media (max-width: 1024px) {
+
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    height: auto;
+    border-bottom: 1px solid var(--border-card);
+    flex-direction: row;
+    padding: 12px;
+    overflow-x: auto;
+  }
+
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================
+   NATIVE PRINT PDF EXPORT STYLES
+   ========================================= */
+
+@media print {
+  @page {
+    size: portrait;
+    margin: 1cm;
+  }
+
+  /* Override global constraints to allow multipage printing */
+  html,
+  body,
+  #root,
+  .app-shell,
+  .main-content {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /* Only activate these styles if React has requested a print via our class */
+  body.print-mode {
+    background: #FFFFFF !important;
+    background-image: none !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide the global layout shells entirely */
+  body.print-mode .sidebar {
+    display: none !important;
+  }
+
+  body.print-mode .page-title {
+    display: none !important;
+  }
+
+  /* Unconstrain the main content area */
+  body.print-mode .main-content {
+    background: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  body.print-mode .container {
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Hide ALL other suites/cards except the one we clicked Export on */
+  body.print-mode .card:not(.print-target) {
+    display: none !important;
+  }
+
+  /* Hide buttons inside the target suite */
+  body.print-mode .print-target button {
+    display: none !important;
+  }
+
+  /* Force absolute crisp styling onto the target block */
+  body.print-mode .print-target {
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* High Contrast System Color Adjustments */
+  body.print-mode * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    animation: none !important;
+    transition: none !important;
+    box-shadow: none !important;
+  }
+
+  body.print-mode .code-block {
+    background-color: #F8FAFC !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #000000 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.print-mode .code-block div {
+    color: #000000 !important;
+  }
+
+  body.print-mode .pill {
+    border-width: 1px !important;
+    border-style: solid !important;
+    font-weight: 700 !important;
+  }
+
+  body.print-mode .pill.pass {
+    color: #059669 !important;
+    background: #D1FAE5 !important;
+    border-color: #10B981 !important;
+  }
+
+  body.print-mode .pill.fail {
+    color: #E11D48 !important;
+    background: #FFE4E6 !important;
+    border-color: #F43F5E !important;
+  }
+
+  body.print-mode .pill.running {
+    color: #0369A1 !important;
+    background: #E0F2FE !important;
+    border-color: #38BDF8 !important;
+  }
+
+  body.print-mode h3,
+  body.print-mode h4,
+  body.print-mode strong {
+    color: #000000 !important;
+  }
+
+  /* Prevent awkward page breaks spanning across a single execution row */
+  body.print-mode .execution-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border-left: 2px solid #E2E8F0 !important;
+  }
+
+  /* Override structural inline variables */
+  body.print-mode [style*="color: var(--text-muted)"] {
+    color: #475569 !important;
+  }
+
+  body.print-mode [style*="color: var(--text-primary)"] {
+    color: #000000 !important;
+  }
+
+  body.print-mode [style*="color: var(--text-secondary)"] {
+    color: #334155 !important;
+  }
+}
+/* Markdown Body Styles */
+.markdown-body {
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 16px;
+}
+.markdown-body th, .markdown-body td {
+  border: 1px solid var(--border-card);
+  padding: 8px 12px;
+  text-align: left;
+}
+.markdown-body th {
+  background-color: var(--surface-dark);
+  font-weight: 600;
+}
+.markdown-body p {
+  margin-bottom: 8px;
+}
+.markdown-body pre {
+  background: var(--bg-void);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-card);
+}
+.markdown-body code {
+  background: var(--bg-void);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  border: 1px solid var(--border-card);
+}
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+  border: none;
+}
+
+/* Explicit overrides for react-markdown table borders so they look good in both light/dark mode */
+.markdown-body table th,
+.markdown-body table td {
+  border: 1px solid var(--border-hover) !important;
+}
+.markdown-body table th {
+  background-color: var(--surface-elevated) !important;
+}

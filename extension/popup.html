@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>LLMSec Security Tester</title>
+  <style>
+    :root {
+      /* Primary Foundation (Light Theme) */
+      --bg-void: #F8FAFC;
+      --surface-dark: #FFFFFF;
+      --surface-elevated: #F1F5F9;
+      --border-card: #E2E8F0;
+      --border-hover: #CBD5E1;
+
+      /* Accent Colors (Darker for readability on light BG) */
+      --neon-mantis: #10B981;
+      --neon-blue: #3B82F6;
+      --neon-red: #EF4444;
+      --neon-amber: #F59E0B;
+      --neon-lime: #84CC16;
+
+      /* Text Colors */
+      --text-primary: #0F172A;
+      --text-secondary: #475569;
+      --text-muted: #94A3B8;
+    }
+
+    body {
+      width: 600px;
+      padding: 0;
+      font-family: 'Inter', -apple-system, sans-serif;
+      margin: 0;
+      background: var(--bg-void);
+      color: var(--text-primary);
+    }
+
+    .popup-container {
+      padding: 24px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-card);
+      position: relative;
+    }
+
+    h1 {
+      color: var(--text-primary);
+      font-size: 22px;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .subtitle {
+      color: var(--neon-mantis);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+      text-shadow: 0 0 8px rgba(57, 255, 133, 0.4);
+    }
+
+    .section {
+      background: var(--surface-dark);
+      padding: 16px;
+      margin-bottom: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border-card);
+      transition: border-color 0.2s;
+    }
+
+    .section:hover {
+      border-color: var(--border-hover);
+    }
+
+    .section-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title.collapsible {
+      cursor: pointer;
+      user-select: none;
+      margin-bottom: 0;
+    }
+
+    .section-title.collapsible:hover {
+      opacity: 0.8;
+    }
+
+    .section-title.collapsible.open {
+      margin-bottom: 12px;
+    }
+
+    .collapse-icon {
+      margin-left: auto;
+      transition: transform 0.2s ease;
+      transform: rotate(-90deg);
+    }
+
+    .section-title.collapsible.open .collapse-icon {
+      transform: rotate(0);
+    }
+
+    .section-content {
+      display: none;
+    }
+
+    .section-content.open {
+      display: block;
+    }
+
+    .input-group {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-void);
+      border: 1px solid var(--border-card);
+      border-radius: 6px;
+      font-size: 13px;
+      color: var(--text-primary);
+      box-sizing: border-box;
+      transition: all 0.2s;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--neon-mantis);
+      box-shadow: 0 0 0 1px rgba(57, 255, 133, 0.2);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+      font-family: inherit;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px 16px;
+      background: var(--text-primary);
+      color: var(--surface-dark);
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 8px;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      background: var(--surface-elevated);
+      color: var(--text-muted);
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: var(--surface-elevated);
+      color: var(--text-primary);
+      border: 1px solid var(--border-card);
+    }
+
+    .btn-secondary:hover {
+      background: var(--border-card);
+      opacity: 1;
+    }
+
+    .btn-danger {
+      background: rgba(255, 56, 96, 0.1);
+      color: var(--neon-red);
+      border: 1px solid rgba(255, 56, 96, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: rgba(255, 56, 96, 0.2);
+      border-color: var(--neon-red);
+      opacity: 1;
+    }
+
+    .status {
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+      border-left: 3px solid transparent;
+    }
+
+    .status.success {
+      background: rgba(57, 255, 133, 0.1);
+      color: var(--neon-mantis);
+      border-left-color: var(--neon-mantis);
+      display: block;
+    }
+
+    .status.error {
+      background: rgba(255, 56, 96, 0.1);
+      color: var(--neon-red);
+      border-left-color: var(--neon-red);
+      display: block;
+    }
+
+    .status.info {
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--neon-blue);
+      border-left-color: var(--neon-blue);
+      display: block;
+    }
+
+    .attack-list {
+      max-height: 220px;
+      overflow-y: auto;
+      margin-right: -4px;
+      padding-right: 4px;
+    }
+
+    .attack-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .attack-list::-webkit-scrollbar-thumb {
+      background: var(--border-hover);
+      border-radius: 3px;
+    }
+
+    .attack-item {
+      padding: 12px;
+      background: var(--surface-elevated);
+      margin-bottom: 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      border: 1px solid var(--border-card);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .attack-item .type {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .attack-item .status {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      margin: 0;
+      border: none;
+    }
+
+    .connection-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .connected {
+      background: var(--neon-mantis);
+      box-shadow: 0 0 8px var(--neon-mantis);
+    }
+
+    .disconnected {
+      background: var(--neon-red);
+      box-shadow: 0 0 8px var(--neon-red);
+    }
+
+    .tabs {
+      display: flex;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-card);
+    }
+
+    .tabs button {
+      flex: 1;
+      background: none;
+      border: none;
+      padding: 12px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-weight: 600;
+      border-bottom: 2px solid transparent;
+      margin: 0;
+      border-radius: 0;
+    }
+
+    .tabs button.active {
+      color: var(--text-primary);
+      border-bottom-color: var(--neon-mantis);
+      text-shadow: 0 0 10px rgba(57, 255, 133, 0.3);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="popup-container">
+    <div class="header">
+      <h1>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+          stroke="var(--neon-mantis)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path
+            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+          </path>
+        </svg>
+        MantisGuard
+      </h1>
+      <div class="subtitle">Agentic Security Framework</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title collapsible" id="serverConfigHeader">
+        <span class="connection-indicator disconnected" id="connectionIndicator"></span>
+        Server Connection
+        <svg class="collapse-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </div>
+      <div class="section-content" id="serverConfigContent">
+        <div id="activeModelContainer"
+          style="display: none; background: rgba(16, 185, 129, 0.1); border: 1px solid var(--neon-mantis); border-radius: 6px; padding: 10px; margin-bottom: 12px; font-size: 12px;">
+          <div
+            style="color: var(--neon-mantis); font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+            Active LLM Model
+          </div>
+          <div style="color: var(--text-primary);"><span id="activeModelName" style="font-weight: 500;"></span> (<span
+              id="activeModelProvider" style="text-transform: capitalize;"></span>)</div>
+        </div>
+        <div class="form-group">
+          <label>Backend API URL</label>
+          <input type="text" id="backendUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
+        </div>
+        <div class="form-group">
+          <label>X-API-Key (Workspace Authenticator)</label>
+          <input type="password" id="apiKey" placeholder="mtis_..." value="">
+        </div>
+        <button id="connectBtn">Connect</button>
+        <div id="connectionStatus" class="status"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Target Selection</div>
+      <div class="input-group">
+        <label>Select Target</label>
+        <select id="targetSelector">
+          <option value="">-- Create New Target --</option>
+        </select>
+      </div>
+      <div id="newTargetForm" style="display: block;">
+        <div class="input-group">
+          <label>Target Name</label>
+          <input type="text" id="targetName" placeholder="e.g., ChatGPT, Claude">
+        </div>
+        <div class="input-group">
+          <label>Target URL</label>
+          <input type="text" id="targetUrl" placeholder="Current page URL">
+        </div>
+        <button id="createTargetBtn" class="btn-secondary">Create Target</button>
+      </div>
+      <div id="selectedTargetInfo"
+        style="display: none; padding: 10px; background: #f0f0f0; border-radius: 4px; margin-top: 10px; font-size: 12px;">
+        <strong>Selected:</strong> <span id="selectedTargetName"></span><br>
+        <span id="selectedTargetContext" style="color: #7f8c8d; font-size: 11px;"></span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title collapsible" id="targetDetectHeader">
+        Target Detection
+        <svg class="collapse-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </div>
+      <div class="section-content" id="targetDetectContent">
+        <div class="input-group">
+          <label>Chat Input Selector</label>
+          <input type="text" id="inputSelector" placeholder="e.g., textarea, #chat-input">
+        </div>
+        <div class="input-group">
+          <label>Send Button Selector</label>
+          <input type="text" id="buttonSelector" placeholder="e.g., button.send, #send-btn">
+        </div>
+        <div class="input-group">
+          <label>Response Selector (Optional)</label>
+          <input type="text" id="responseSelector" placeholder="e.g., [data-message-author-role='assistant']">
+        </div>
+        <div class="input-group" id="humanFeedbackContainer" style="margin-bottom: 12px;">
+          <label>Mock Human Confirmation Response</label>
+          <select id="globalHumanFeedback"
+            title="If the bot asks for confirmation, the Agent will automatically reply with this.">
+            <option value="">None (Ask Human directly)</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Confirmation Button Selector (Optional)</label>
+          <input type="text" id="confirmButtonSelector" placeholder="e.g., button.confirm, #yes-btn"
+            title="If Mock Human Confirmation matches, the agent will click this button instead of typing a chat.">
+        </div>
+        <button id="detectBtn">Auto-Detect</button>
+        <button id="testSelectors" class="btn-secondary">Test Selectors</button>
+        <div id="detectionStatus" class="status"></div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button id="tabTesting" class="active">Functional Testing</button>
+      <button id="tabSecurity">Security Ops</button>
+    </div>
+
+    <div id="contentTesting" style="display: block;">
+      <div class="section">
+        <div class="section-title">Functional Execution</div>
+        <div class="subtitle"
+          style="margin-bottom: 16px; color: var(--text-secondary); text-transform: none; font-weight: 400; text-shadow: none;">
+          Select a Target and filter by Use Case to load Test Cases.</div>
+
+        <div class="input-group" id="testSuiteFilterContainer" style="display: none; margin-bottom: 12px;">
+          <label>Active Test Cycle</label>
+          <select id="testSuiteSelector">
+            <option value="">Global (All Executions)</option>
+          </select>
+        </div>
+
+
+        <div class="input-group" id="useCaseFilterContainer" style="display: none; margin-bottom: 16px;">
+          <label>Filter by Use Case</label>
+          <select id="useCaseSelector">
+            <option value="all">-- All Use Cases --</option>
+          </select>
+        </div>
+
+        <div id="noTargetMsg" style="color: var(--neon-red); font-size: 13px; margin-bottom: 10px; font-weight: 500;">
+          Please Select a Target to enable Functional Testing</div>
+        <button id="loadTestCasesBtn" class="btn-secondary" style="display: none;">Refresh Test
+          Cases</button>
+
+        <div id="testCasesContainer" class="attack-list" style="margin-top: 16px; display: none; padding-right: 8px;">
+        </div>
+      </div>
+    </div>
+
+    <div id="contentSecurity" style="display: none;">
+      <div class="section">
+        <div class="section-title">Attack Configuration</div>
+        <div class="input-group">
+          <label>Attack Type</label>
+          <select id="attackType">
+            <option value="prompt_injection">Prompt Injection</option>
+            <option value="role_playing">Role Playing</option>
+            <option value="jailbreak">Jailbreak</option>
+            <option value="persuasion">Persuasion</option>
+            <option value="storytelling">Storytelling</option>
+            <option value="encoding">Encoding</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Attack Mode</label>
+          <select id="attackMode">
+            <option value="single">Single Turn</option>
+            <option value="sequential">Sequential</option>
+            <option value="adaptive">Adaptive</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Target Behavior (Optional)</label>
+          <input type="text" id="targetBehavior" placeholder="e.g., reveal system prompt">
+        </div>
+      </div>
+
+      <div class="section">
+        <button id="startAttack" disabled>Start Attack</button>
+        <button id="stopAttack" class="btn-danger" style="display: none;">Stop Attack</button>
+        <div id="attackStatus" class="status"></div>
+      </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+
+</html>
