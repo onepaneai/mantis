@@ -69,6 +69,20 @@ npm run dev
 
 ---
 
+## 🖼️ Screenshots
+
+### Use Cases Overview with Pass Rate Stats
+![Use Cases List](screenshots/use-cases-list.png)
+
+### Dashboard — Functional Testing Analytics
+![Dashboard Overview](screenshots/dashboard-overview.png)
+
+### Test Case Results — 100% Pass Rate
+![Test Cases View](screenshots/test-cases-view.png)
+
+---
+
+
 ## 📚 Documentation
 For detailed guides on setting up, using the Chrome Extension, and exploring the backend models, please check our documentation folder.
 

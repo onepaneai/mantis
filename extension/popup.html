@@ -426,19 +426,10 @@
           <label>Response Selector (Optional)</label>
           <input type="text" id="responseSelector" placeholder="e.g., [data-message-author-role='assistant']">
         </div>
-        <div class="input-group" id="humanFeedbackContainer" style="margin-bottom: 12px;">
-          <label>Mock Human Confirmation Response</label>
-          <select id="globalHumanFeedback"
-            title="If the bot asks for confirmation, the Agent will automatically reply with this.">
-            <option value="">None (Ask Human directly)</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
-        </div>
         <div class="input-group">
           <label>Confirmation Button Selector (Optional)</label>
           <input type="text" id="confirmButtonSelector" placeholder="e.g., button.confirm, #yes-btn"
-            title="If Mock Human Confirmation matches, the agent will click this button instead of typing a chat.">
+            title="If the AI detects the bot is asking for confirmation (Create/Update/Delete), the agent will click this button.">
         </div>
         <button id="detectBtn">Auto-Detect</button>
         <button id="testSelectors" class="btn-secondary">Test Selectors</button>

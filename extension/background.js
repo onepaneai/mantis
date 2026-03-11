@@ -955,8 +955,11 @@ async function runFunctionalTestInBackground(runId, config) {
 
   let chatHistory = null;
   let turn = 0;
-  const maxTurns = 5;
+  let questionCount = 0;     // Track follow-up questions — cap at 2 to match backend
+  const maxTurns = 8;
+  const maxQuestions = 2;
   let nextInput = tc.input_prompt;
+  let testCompleted = false;  // Track if we reached a proper final score
 
   try {
     while (turn < maxTurns) {
@@ -1029,11 +1032,19 @@ async function runFunctionalTestInBackground(runId, config) {
 
           if (stableCount >= 5) {
             await updateWidgetStatus(tabId, tc.id, `${prefix}Checking if bot is still processing...`);
+            let confirmBtnExists = false;
+            if (confirmButtonSelector) {
+              try {
+                const checkRes = await new Promise(r => chrome.tabs.sendMessage(tabId, { action: 'checkElementExists', selector: confirmButtonSelector }, r));
+                confirmBtnExists = checkRes?.exists || false;
+              } catch (e) { /* ignore */ }
+            }
+
             const executePayload = {
               test_case_id: tc.id,
               response_text: response.text,
               chat_history: chatHistory,
-              human_feedback: globalHumanFeedback || null
+              has_confirm_button: confirmBtnExists
             };
             if (testSuiteId) executePayload.test_suite_id = testSuiteId;
 
@@ -1084,11 +1095,19 @@ async function runFunctionalTestInBackground(runId, config) {
       if (!evalData) {
         await updateWidgetStatus(tabId, tc.id, `${prefix}Grading response...`);
 
+        let confirmBtnExists = false;
+        if (confirmButtonSelector) {
+          try {
+            const checkRes = await new Promise(r => chrome.tabs.sendMessage(tabId, { action: 'checkElementExists', selector: confirmButtonSelector }, r));
+            confirmBtnExists = checkRes?.exists || false;
+          } catch (e) { /* ignore */ }
+        }
+
         const executePayload = {
           test_case_id: tc.id,
           response_text: response.text,
           chat_history: chatHistory,
-          human_feedback: globalHumanFeedback || null
+          has_confirm_button: confirmBtnExists
         };
         if (testSuiteId) executePayload.test_suite_id = testSuiteId;
 
@@ -1105,29 +1124,48 @@ async function runFunctionalTestInBackground(runId, config) {
         evalData = await evalRes.json();
       }
 
-      if (evalData.action === "continue" && evalData.reply) {
+      if (evalData.action === "click_confirm" && confirmButtonSelector) {
+        await updateWidgetStatus(tabId, tc.id, `${prefix}Bot paused. Clicking custom confirmation button...`, 'warn');
+        await new Promise(r => chrome.tabs.sendMessage(tabId, { action: 'clickConfirmButton', confirmButtonSelector }, r));
+        nextInput = null;
+        chatHistory = evalData.chat_history || chatHistory;
+        await sleep(2000);
+      } else if (evalData.action === "continue" && evalData.reply) {
         chatHistory = evalData.chat_history;
         nextInput = evalData.reply;
+        questionCount++;
 
-        if (globalHumanFeedback && (globalHumanFeedback === evalData.reply) && confirmButtonSelector) {
-          await updateWidgetStatus(tabId, tc.id, `${prefix}Bot paused. Clicking custom confirmation...`, 'warn');
-          await new Promise(r => chrome.tabs.sendMessage(tabId, { action: 'clickConfirmButton', confirmButtonSelector }, r));
-          nextInput = null;
-        } else {
-          await updateWidgetStatus(tabId, tc.id, `${prefix}Bot asked a question. AI generated reply: "${nextInput.substring(0, 30)}..."`, 'warn');
+        if (questionCount >= maxQuestions) {
+          // Hit follow-up question cap — force complete so batch moves on
+          await updateWidgetStatus(tabId, tc.id, `${prefix}Max follow-ups reached. Completing.`, 'warn');
+          chrome.runtime.sendMessage({ type: 'functionalTestComplete', tcId: tc.id, score: 0 }, () => {
+            if (chrome.runtime.lastError) { /* ignore */ }
+          });
+          testCompleted = true;
+          break;
         }
+
+        await updateWidgetStatus(tabId, tc.id, `${prefix}Bot asked a question. AI reply: "${nextInput.substring(0, 30)}..."`, 'warn');
         await sleep(2000);
       } else {
         // Complete
         const score = evalData.result.evaluation_score;
         const isPass = score >= 0.8;
         await updateWidgetStatus(tabId, tc.id, `${prefix}Score: ${(score * 100).toFixed(0)}%`, isPass ? 'success' : 'error');
-        // Notify popup if open
         chrome.runtime.sendMessage({ type: 'functionalTestComplete', tcId: tc.id, score }, () => {
           if (chrome.runtime.lastError) { /* ignore */ }
         });
+        testCompleted = true;
         break;
       }
+    }
+
+    // If the while loop ran out of turns without completing, report it
+    if (!testCompleted && session.isRunning) {
+      await updateWidgetStatus(tabId, tc.id, `${prefix}Max turns reached without final answer.`, 'warn');
+      chrome.runtime.sendMessage({ type: 'functionalTestComplete', tcId: tc.id, score: 0 }, () => {
+        if (chrome.runtime.lastError) { /* ignore */ }
+      });
     }
   } catch (e) {
     await updateWidgetStatus(tabId, tc.id, `${prefix}Error: ${e.message}`, 'error');

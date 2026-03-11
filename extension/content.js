@@ -28,6 +28,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'checkElementExists') {
+    try {
+      const el = document.querySelector(request.selector);
+      sendResponse({ exists: el ? isVisible(el) : false });
+    } catch (e) {
+      sendResponse({ exists: false, error: e.message });
+    }
+    return true;
+  }
+
   if (request.action === 'getResponse') {
     const result = getLatestResponse(request.responseSelector, request.buttonSelector);
     sendResponse(result);

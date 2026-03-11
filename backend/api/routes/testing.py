@@ -371,7 +371,9 @@ async def execute_test_case(
 
         chat_history = f"User: {tc.input_prompt}\n"
         current_input = tc.input_prompt
-        max_turns = 5
+        max_turns = 8
+        question_count = 0
+        max_questions = 2  # Max follow-up questions the AI agent is allowed to ask
         turn = 0
         final_score = 0.0
         final_reason = ""
@@ -396,7 +398,9 @@ async def execute_test_case(
                     chat_history += f"Bot: {response_text}\n"
                     
                     eval_res = await evaluate_or_continue_test(
-                        bot.context or "", bot.agent_memory or "", uc.description, tc.input_prompt, chat_history, expected_output=tc.expected_output, human_feedback=req.human_feedback
+                        bot.context or "", bot.agent_memory or "", uc.description, tc.input_prompt, chat_history,
+                        expected_output=tc.expected_output, human_feedback=req.human_feedback,
+                        questions_asked=question_count, max_questions=max_questions
                     )
                     
                     if eval_res.get("action") == "continue":
@@ -404,8 +408,13 @@ async def execute_test_case(
                         if not synthetic_reply:
                             final_reason = "Bot asked a question but AI failed to generate a synthetic reply."
                             break
+                        question_count += 1
                         chat_history += f"User (Synthetic): {synthetic_reply}\n"
                         current_input = synthetic_reply
+                        # Enforce max follow-up question limit
+                        if question_count >= max_questions:
+                            final_reason = f"Max follow-up questions ({max_questions}) reached. The bot kept asking questions without resolving the task."
+                            break
                     else:
                         final_score = eval_res.get("score", 0.0)
                         final_reason = eval_res.get("reason", "")
@@ -442,6 +451,7 @@ class BrowserExecutionRequest(BaseModel):
     chat_history: Optional[str] = None
     test_suite_id: Optional[str] = None
     human_feedback: Optional[str] = None
+    has_confirm_button: bool = False
 
 @router.post("/execute/browser")
 async def execute_browser_test_case(
@@ -460,12 +470,22 @@ async def execute_browser_test_case(
     chat_history += f"Bot: {req.response_text}\n"
 
     from core.ai_usecase_generator import evaluate_or_continue_test
-    eval_res = await evaluate_or_continue_test(bot.context or "", bot.agent_memory or "", uc.description, tc.input_prompt, chat_history, expected_output=tc.expected_output, human_feedback=req.human_feedback)
+    
+    # Only pass the human feedback override if a physical UI button actually exists to click
+    effective_feedback = req.human_feedback if req.has_confirm_button else None
+    
+    eval_res = await evaluate_or_continue_test(bot.context or "", bot.agent_memory or "", uc.description, tc.input_prompt, chat_history, expected_output=tc.expected_output, human_feedback=effective_feedback)
     
     action = eval_res.get("action", "complete")
     if action == "wait":
         return {
             "action": "wait",
+            "chat_history": chat_history
+        }
+    elif action == "click_confirm":
+        chat_history += f"System (Action): Clicked Confirmation Button in UI\n"
+        return {
+            "action": "click_confirm",
             "chat_history": chat_history
         }
     elif action == "continue":

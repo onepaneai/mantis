@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import LoginPage from './pages/LoginPage'
@@ -35,7 +35,18 @@ const PrivateRoute = ({ children }) => {
 
 function DashboardLayout() {
   const { userOrganizations, activeOrgId, setActiveOrgId } = useAuth();
-  const [activeBot, setActiveBot] = useState(null)
+
+  // Lazy-initialized from localStorage so it's already available on first render
+  const [activeBot, setActiveBot] = useState(() => {
+    try {
+      const saved = localStorage.getItem('llmsec_activeBot');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    () => localStorage.getItem('llmsec_selectedProject') || ''
+  );
 
   // Navigation State
   const [activeArea, setActiveArea] = useState('testing')
@@ -54,16 +65,40 @@ function DashboardLayout() {
 
   // Project State for Active Bot
   const [projects, setProjects] = useState([])
-  const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [isLoadingProjects, setIsLoadingProjects] = useState(!!activeBot)
   const [showCreateProject, setShowCreateProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDesc, setNewProjectDesc] = useState('')
 
+  // Track org ID ref to detect real org changes (not initial mount)
+  const prevOrgId = useRef(activeOrgId);
+
+  // --- Persist selections to localStorage whenever they change ---
   useEffect(() => {
-    setActiveBot(null);
+    if (activeBot) localStorage.setItem('llmsec_activeBot', JSON.stringify(activeBot));
+    else localStorage.removeItem('llmsec_activeBot');
+  }, [activeBot]);
+
+  useEffect(() => {
+    if (selectedProjectId) localStorage.setItem('llmsec_selectedProject', selectedProjectId);
+    else localStorage.removeItem('llmsec_selectedProject');
+  }, [selectedProjectId]);
+
+  // --- Initial load & org changes ---
+  useEffect(() => {
+    // True org change (not initial mount)
+    if (prevOrgId.current !== activeOrgId) {
+      prevOrgId.current = activeOrgId;
+      // Clear bot and project when user intentionally switches org
+      if (activeBot && activeBot.organization_id !== activeOrgId) {
+        setActiveBot(null);
+      }
+      setSelectedProjectId('');
+    }
     loadBots();
     loadLegacyData();
     loadActiveModel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeOrgId])
 
   const loadActiveModel = async () => {
@@ -86,10 +121,13 @@ function DashboardLayout() {
     try {
       const res = await axios.get(`${API_URL}/targets/`)
       setBots(res.data)
-      if (activeBot) {
-        const updatedBot = res.data.find(b => b.id === activeBot.id)
-        if (updatedBot) setActiveBot(updatedBot)
-      }
+      // Refresh the activeBot object if it's currently set (to reflect any server-side changes)
+      // Important: use functional updater so we always read latest state
+      setActiveBot(prev => {
+        if (!prev) return prev;
+        const updatedBot = res.data.find(b => b.id === prev.id);
+        return updatedBot || prev;
+      });
     } catch (error) {
       console.error('Failed to load bots:', error)
     }
@@ -108,22 +146,39 @@ function DashboardLayout() {
     }
   }
 
+  // Load projects whenever the active bot changes
   useEffect(() => {
     if (activeBot) {
-      loadProjects()
+      setIsLoadingProjects(true)
+      loadProjects(activeBot.id)
     } else {
       setProjects([])
-      setSelectedProjectId('')
       setShowCreateProject(false)
+      setIsLoadingProjects(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBot?.id])
 
-  const loadProjects = async () => {
+  const loadProjects = async (botId) => {
     try {
-      const res = await axios.get(`${API_URL}/targets/${activeBot.id}/projects`)
-      setProjects(res.data)
+      const res = await axios.get(`${API_URL}/targets/${botId}/projects`)
+      const fetchedProjects = res.data;
+      setProjects(fetchedProjects)
+
+      // Read directly from localStorage (not stale closure) to validate the saved selection
+      const savedProjectId = localStorage.getItem('llmsec_selectedProject') || '';
+      if (savedProjectId && fetchedProjects.find(p => p.id === savedProjectId)) {
+        // Saved project exists in this bot's projects — restore it
+        setSelectedProjectId(savedProjectId);
+      } else if (savedProjectId) {
+        // Saved project doesn't belong to this bot — clear it
+        setSelectedProjectId('');
+      }
+      // If savedProjectId is '' (Global), do nothing — keep it as Global
     } catch (e) {
       console.error("Failed to load projects", e)
+    } finally {
+      setIsLoadingProjects(false)
     }
   }
 
@@ -206,23 +261,27 @@ function DashboardLayout() {
             {/* Project Scope in Sidebar */}
             <div style={{ padding: '0 24px', marginBottom: '16px' }}>
               <div style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '6px' }}>Project Scope</div>
-              <select
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                style={{
-                  width: '100%',
-                  background: 'var(--surface-dark)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-card)',
-                  padding: '6px',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  marginBottom: '8px'
-                }}
-              >
-                <option value="">Global (All Projects)</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              {isLoadingProjects ? (
+                <div style={{ padding: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>Loading projects...</div>
+              ) : (
+                <select
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: 'var(--surface-dark)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-card)',
+                    padding: '6px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    marginBottom: '8px'
+                  }}
+                >
+                  <option value="">Global (All Projects)</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              )}
               <button
                 className="secondary"
                 style={{ width: '100%', padding: '4px', fontSize: '11px' }}
@@ -470,7 +529,15 @@ function BotSelection({ bots, onSelectBot, showForm, setShowForm, onRefresh }) {
 
 function BotDashboard({ bot, activeArea, datasets, evaluations, onRefreshLegacy, selectedProjectId }) {
   const [stats, setStats] = useState(null)
-  const [testSuiteId, setTestSuiteId] = useState('')
+  const [testSuiteId, setTestSuiteId] = useState(
+    () => localStorage.getItem('llmsec_testSuiteId') || ''
+  );
+
+  // Persist test suite ID changes
+  useEffect(() => {
+    if (testSuiteId) localStorage.setItem('llmsec_testSuiteId', testSuiteId);
+    else localStorage.removeItem('llmsec_testSuiteId');
+  }, [testSuiteId]);
 
   useEffect(() => {
     loadStats()
@@ -748,6 +815,7 @@ function TestingArea({ bot, stats, testSuiteId, setTestSuiteId, onStatsRefresh, 
   const [globalHumanFeedback, setGlobalHumanFeedback] = useState("")
 
   const [testSuites, setTestSuites] = useState([])
+  const [isLoadingSuites, setIsLoadingSuites] = useState(true)
   const [showCreateSuite, setShowCreateSuite] = useState(false)
   const [newSuiteName, setNewSuiteName] = useState('')
   const [newSuiteDesc, setNewSuiteDesc] = useState('')
@@ -760,12 +828,26 @@ function TestingArea({ bot, stats, testSuiteId, setTestSuiteId, onStatsRefresh, 
   }, [bot.id, selectedProjectId])
 
   const loadTestSuites = async () => {
+    setIsLoadingSuites(true)
     try {
       const projParam = selectedProjectId ? `?project_id=${selectedProjectId}` : '';
       const res = await axios.get(`${API_URL}/testing/suites/${bot.id}${projParam}`)
-      setTestSuites(res.data)
+      const fetchedSuites = res.data;
+      setTestSuites(fetchedSuites)
+
+      // Read directly from localStorage (not stale closure) to validate the saved selection
+      const savedSuiteId = localStorage.getItem('llmsec_testSuiteId') || '';
+      if (savedSuiteId && fetchedSuites.find(s => s.id === savedSuiteId)) {
+        // Saved test cycle exists — restore it
+        setTestSuiteId(savedSuiteId);
+      } else if (savedSuiteId) {
+        // Saved test cycle doesn't belong here — clear it
+        setTestSuiteId('');
+      }
     } catch (e) {
       console.error(e)
+    } finally {
+      setIsLoadingSuites(false)
     }
   }
 
@@ -971,10 +1053,14 @@ function TestingArea({ bot, stats, testSuiteId, setTestSuiteId, onStatsRefresh, 
       <div className="card" style={{ marginBottom: '24px', display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
           <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', display: 'block' }}>Active Test Cycle</label>
-          <select value={testSuiteId} onChange={e => setTestSuiteId(e.target.value)} style={{ width: '100%', maxWidth: '350px', background: 'var(--bg-void)' }}>
-            <option value="">Global (All Executions)</option>
-            {testSuites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+          {isLoadingSuites ? (
+            <div style={{ padding: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>Loading test cycles...</div>
+          ) : (
+            <select value={testSuiteId} onChange={e => setTestSuiteId(e.target.value)} style={{ width: '100%', maxWidth: '350px', background: 'var(--bg-void)' }}>
+              <option value="">Global (All Executions)</option>
+              {testSuites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
         </div>
         <div style={{ flex: 1 }}>
           <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', display: 'block' }}>Mock Human Confirmation Response</label>
@@ -1139,6 +1225,79 @@ function TestingArea({ bot, stats, testSuiteId, setTestSuiteId, onStatsRefresh, 
     </div>
   )
 }
+
+function TranscriptFormatter({ text, isPrintMode }) {
+  if (!text) return null;
+
+  // Split right before each known role prefix — MUST include "User (Synthetic):" BEFORE "User:"
+  const parts = text.split(/(?=User \(Synthetic\):|User:|Bot:|System \(Action\):)/g).filter(p => p.trim() !== '');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {parts.length === 1 && !/(User \(Synthetic\):|User:|Bot:|System \(Action\):)/.test(parts[0]) ? (
+        <div style={{ color: isPrintMode ? '#000' : 'var(--text-primary)' }}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{parts[0]}</ReactMarkdown>
+        </div>
+      ) : (
+        parts.map((msg, idx) => {
+          let content = msg;
+          let bgColor = 'transparent';
+          let textColor = isPrintMode ? '#000' : 'var(--text-primary)';
+          let borderColor = 'transparent';
+          let label = '';
+          let labelColor = '';
+
+          if (msg.startsWith('User (Synthetic):')) {
+            content = msg.replace('User (Synthetic):', '').trim();
+            bgColor = isPrintMode ? '#FFFBEB' : 'rgba(251, 191, 36, 0.07)';
+            borderColor = isPrintMode ? '#FCD34D' : 'rgba(251, 191, 36, 0.4)';
+            label = 'User (Follow-up)';
+            labelColor = isPrintMode ? '#B45309' : '#fbbf24';
+          } else if (msg.startsWith('User:')) {
+            content = msg.replace('User:', '').trim();
+            bgColor = isPrintMode ? '#F1F5F9' : 'rgba(56, 189, 248, 0.05)';
+            borderColor = isPrintMode ? '#CBD5E1' : 'rgba(56, 189, 248, 0.3)';
+            label = 'User';
+            labelColor = isPrintMode ? '#0284C7' : '#38bdf8';
+          } else if (msg.startsWith('Bot:')) {
+            content = msg.replace('Bot:', '').trim();
+            bgColor = isPrintMode ? '#F0FDF4' : 'rgba(74, 222, 128, 0.05)';
+            borderColor = isPrintMode ? '#86EFAC' : 'rgba(74, 222, 128, 0.3)';
+            label = 'Bot';
+            labelColor = isPrintMode ? '#16A34A' : '#4ade80';
+          } else if (msg.startsWith('System (Action):')) {
+            content = msg.replace('System (Action):', '').trim();
+            bgColor = isPrintMode ? '#FEF2F2' : 'rgba(244, 63, 94, 0.05)';
+            borderColor = isPrintMode ? '#FCA5A5' : 'rgba(244, 63, 94, 0.3)';
+            label = 'System Action';
+            labelColor = isPrintMode ? '#DC2626' : '#f43f5e';
+          }
+
+          return (
+            <div key={idx} style={{
+              background: bgColor,
+              borderLeft: `3px solid ${borderColor}`,
+              padding: '8px 12px',
+              borderRadius: '0 4px 4px 0',
+              marginBottom: '4px'
+            }}>
+              {label && (
+                <div style={{ fontSize: '11px', fontWeight: 600, color: labelColor, textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
+                  {label}
+                </div>
+              )}
+              <div className="markdown-body" style={{ color: textColor, fontSize: '13px', margin: 0 }}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+              </div>
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
+
 
 function TestCasesArea({ useCase, testSuiteId, globalHumanFeedback }) {
   const [testCases, setTestCases] = useState([])
@@ -1508,7 +1667,7 @@ function TestCasesArea({ useCase, testSuiteId, globalHumanFeedback }) {
                                     {isTranscript ? 'Agentic Conversation Transcript' : 'Bot Response'}
                                   </div>
                                   <div className="markdown-body">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{responseText}</ReactMarkdown>
+                                    <TranscriptFormatter text={responseText} isPrintMode={false} />
                                   </div>
                                 </div>
                                 {aiReason && (
@@ -1923,7 +2082,7 @@ function TestCyclesArea({ bot, selectedProjectId }) {
                                 {isTranscript ? 'Agentic Conversation Transcript' : 'Bot Response'}
                               </div>
                               <div className="markdown-body" style={{ color: exportExpanding === suite.id ? '#000000' : 'var(--text-primary)' }}>
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{responseText}</ReactMarkdown>
+                                <TranscriptFormatter text={responseText} isPrintMode={exportExpanding === suite.id} />
                               </div>
                             </div>
                             {aiReason && (

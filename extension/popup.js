@@ -65,7 +65,7 @@ async function handleConnect() {
 }
 
 // Load saved settings
-chrome.storage.local.get(['backendUrl', 'apiKey', 'inputSelector', 'buttonSelector', 'responseSelector', 'globalHumanFeedback', 'confirmButtonSelector', 'testSuiteSelector', 'useCaseSelector'], (data) => {
+chrome.storage.local.get(['backendUrl', 'apiKey', 'inputSelector', 'buttonSelector', 'responseSelector', 'confirmButtonSelector', 'testSuiteSelector', 'useCaseSelector'], (data) => {
   // Server Config
   if (data.backendUrl) document.getElementById('backendUrl').value = data.backendUrl;
   if (data.apiKey) document.getElementById('apiKey').value = data.apiKey;
@@ -83,7 +83,6 @@ chrome.storage.local.get(['backendUrl', 'apiKey', 'inputSelector', 'buttonSelect
     document.getElementById('inputSelector').value = data.inputSelector;
     document.getElementById('buttonSelector').value = data.buttonSelector;
     if (data.responseSelector) document.getElementById('responseSelector').value = data.responseSelector;
-    if (data.globalHumanFeedback) document.getElementById('globalHumanFeedback').value = data.globalHumanFeedback;
     if (data.confirmButtonSelector) document.getElementById('confirmButtonSelector').value = data.confirmButtonSelector;
   } else {
     document.getElementById('targetDetectHeader').classList.add('open');
@@ -92,7 +91,7 @@ chrome.storage.local.get(['backendUrl', 'apiKey', 'inputSelector', 'buttonSelect
 });
 
 // Save settings on input change
-['backendUrl', 'apiKey', 'inputSelector', 'buttonSelector', 'responseSelector', 'globalHumanFeedback', 'confirmButtonSelector', 'testSuiteSelector', 'useCaseSelector'].forEach(id => {
+['backendUrl', 'apiKey', 'inputSelector', 'buttonSelector', 'responseSelector', 'confirmButtonSelector', 'testSuiteSelector', 'useCaseSelector'].forEach(id => {
   const el = document.getElementById(id);
   if (el) {
     el.addEventListener('change', (e) => {
@@ -134,6 +133,8 @@ async function loadTargets(backendUrl, apiKey, selectedTargetId = null) {
 
       // Also fetch Active LLM Model for display
       await loadActiveModel(backendUrl, apiKey);
+    } else {
+      throw new Error(`Server returned HTTP ${response.status}`);
     }
   } catch (error) {
     console.error('Failed to load targets:', error);
@@ -158,6 +159,8 @@ async function loadActiveModel(backendUrl, apiKey) {
           container.style.display = 'none';
         }
       }
+    } else {
+      throw new Error(`Server returned HTTP ${res.status}`);
     }
   } catch (err) {
     console.error("Failed to load active model for extension:", err);
@@ -174,7 +177,6 @@ function handleTargetSelection() {
     document.getElementById('newTargetForm').style.display = 'block';
     document.getElementById('selectedTargetInfo').style.display = 'none';
     document.getElementById('noTargetMsg').style.display = 'block';
-    document.getElementById('humanFeedbackContainer').style.display = 'none';
     document.getElementById('loadTestCasesBtn').style.display = 'none';
     document.getElementById('testCasesContainer').style.display = 'none';
     selectedTarget = null;
@@ -190,7 +192,6 @@ function handleTargetSelection() {
       document.getElementById('selectedTargetContext').textContent = contextText;
 
       document.getElementById('noTargetMsg').style.display = 'none';
-      document.getElementById('humanFeedbackContainer').style.display = 'block';
       document.getElementById('loadTestCasesBtn').style.display = 'block';
       document.getElementById('testCasesContainer').style.display = 'block';
 
@@ -236,6 +237,8 @@ async function loadTestSuites() {
         // Now that Test Suite dropdown is ready, proceed to load use cases bounded by its project_id
         loadFunctionalTests(tsSelector.value);
       });
+    } else {
+      throw new Error(`Server returned HTTP ${res.status}`);
     }
   } catch (error) {
     console.error('Failed to load test suites:', error);
@@ -545,6 +548,12 @@ async function loadFunctionalTests(suiteId = null) {
       } else {
         renderTestCases('all');
       }
+
+      // Add event listener for tracking manual changes
+      ucSelector.onchange = (e) => {
+        chrome.storage.local.set({ useCaseSelector: e.target.value });
+        renderTestCases(e.target.value);
+      };
     });
 
   } catch (err) {
@@ -568,31 +577,58 @@ async function renderTestCases(filterUcId) {
     return;
   }
 
+  // Global Run Selected toolbar (shown above all UCs)
+  const globalToolbar = document.createElement('div');
+  globalToolbar.id = 'global-selection-toolbar';
+  globalToolbar.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 8px 4px; margin-bottom: 8px; border-bottom: 2px solid var(--border-card);';
+  globalToolbar.innerHTML = `
+    <span id="selection-count-label" style="font-size: 12px; color: var(--text-muted);">0 selected</span>
+    <button id="run-selected-global-btn" class="btn-primary" style="font-size: 11px; padding: 5px 12px; background: var(--neon-mantis); color: var(--surface-dark); border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">▶ Run Selected</button>
+  `;
+  container.appendChild(globalToolbar);
+  document.getElementById('run-selected-global-btn').addEventListener('click', () => window.runSelectedTests());
+
+  function updateSelectionCount() {
+    const total = container.querySelectorAll('.tc-checkbox:checked').length;
+    document.getElementById('selection-count-label').textContent = `${total} selected`;
+  }
+
   for (const uc of useCasesToRender) {
     try {
-      // Fetch test cases for this Use Case
       const tcRes = await fetch(`${backendUrl}/api/v1/testing/testcases/${uc.id}`, { headers: { "X-API-Key": apiKey } });
+      if (!tcRes.ok) throw new Error(`HTTP ${tcRes.status} loading test cases.`);
       const testCases = await tcRes.json();
 
       if (testCases.length > 0) {
         // Use Case Header Row
         const ucTitle = document.createElement('div');
         ucTitle.className = 'uc-header';
-        ucTitle.style.display = 'flex';
-        ucTitle.style.justifyContent = 'space-between';
-        ucTitle.style.alignItems = 'center';
-        ucTitle.style.padding = '8px 4px';
-        ucTitle.style.marginTop = '16px';
-        ucTitle.style.borderBottom = '1px solid var(--border-card)';
+        ucTitle.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 8px 4px; margin-top: 16px; border-bottom: 1px solid var(--border-card); gap: 8px;';
 
         ucTitle.innerHTML = `
-          <div style="font-weight: 600; color: var(--text-primary); font-size: 14px;">${uc.name}</div>
-          <button class="btn-secondary run-all-btn" style="font-size: 11px; padding: 4px 10px;">Run All</button>
+          <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+            <input type="checkbox" class="uc-select-all" title="Select all in this group" style="cursor: pointer; accent-color: var(--neon-mantis); width: 14px; height: 14px; flex-shrink: 0;" data-uc-id="${uc.id}">
+            <div style="font-weight: 600; color: var(--text-primary); font-size: 14px;">${uc.name}</div>
+          </div>
+          <div style="display: flex; gap: 6px; flex-shrink: 0;">
+            <button class="btn-secondary run-selected-uc-btn" style="font-size: 11px; padding: 4px 10px;">Run Selected</button>
+            <button class="btn-secondary run-all-btn" style="font-size: 11px; padding: 4px 10px;">Run All</button>
+          </div>
         `;
         container.appendChild(ucTitle);
 
         const runAllBtn = ucTitle.querySelector('.run-all-btn');
         runAllBtn.addEventListener('click', () => window.runAllTests(uc.id));
+
+        const runSelectedUcBtn = ucTitle.querySelector('.run-selected-uc-btn');
+        runSelectedUcBtn.addEventListener('click', () => window.runSelectedTests(uc.id));
+
+        const selectAllCb = ucTitle.querySelector('.uc-select-all');
+        selectAllCb.addEventListener('change', (e) => {
+          const checkboxes = container.querySelectorAll(`.tc-checkbox[data-uc-id="${uc.id}"]`);
+          checkboxes.forEach(cb => cb.checked = e.target.checked);
+          updateSelectionCount();
+        });
 
         // Test Case Items
         testCases.forEach(tc => {
@@ -602,18 +638,10 @@ async function renderTestCases(filterUcId) {
           const tcItem = document.createElement('div');
           tcItem.className = 'attack-item';
           tcItem.id = `tc-${tc.id}`;
-          tcItem.style.background = 'transparent';
-          tcItem.style.border = 'none';
-          tcItem.style.borderBottom = '1px solid var(--border-hover)';
-          tcItem.style.borderRadius = '0';
-          tcItem.style.padding = '12px 4px';
-          tcItem.style.margin = '0';
-          tcItem.style.display = 'flex';
-          tcItem.style.flexDirection = 'row';
-          tcItem.style.alignItems = 'center';
-          tcItem.style.gap = '12px';
+          tcItem.style.cssText = 'background: transparent; border: none; border-bottom: 1px solid var(--border-hover); border-radius: 0; padding: 12px 4px; margin: 0; display: flex; flex-direction: row; align-items: center; gap: 12px;';
 
           tcItem.innerHTML = `
+            <input type="checkbox" class="tc-checkbox" data-tc-id="${tc.id}" data-uc-id="${uc.id}" style="cursor: pointer; accent-color: var(--neon-mantis); width: 14px; height: 14px; flex-shrink: 0;">
             <div style="flex: 1 1 auto; padding-right: 12px;">
               <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px;">
                 <div style="font-weight: 500; font-size: 13px; color: var(--text-primary); white-space: normal; overflow-wrap: break-word; word-break: normal;">${tc.name}</div>
@@ -625,6 +653,16 @@ async function renderTestCases(filterUcId) {
             <button class="btn-secondary run-tc-btn" style="flex: 0 0 auto; width: 80px; margin-top: 0; padding: 6px 16px; background: var(--text-primary); color: var(--surface-dark); border: none; align-self: center;">Run</button>
           `;
           container.appendChild(tcItem);
+
+          // Update global count when individual checkbox changes
+          tcItem.querySelector('.tc-checkbox').addEventListener('change', () => {
+            updateSelectionCount();
+            // Update UC-level select-all checkbox state
+            const allUcCbs = container.querySelectorAll(`.tc-checkbox[data-uc-id="${uc.id}"]`);
+            const allChecked = Array.from(allUcCbs).every(cb => cb.checked);
+            selectAllCb.checked = allChecked;
+            selectAllCb.indeterminate = !allChecked && Array.from(allUcCbs).some(cb => cb.checked);
+          });
 
           const runTcBtn = tcItem.querySelector('.run-tc-btn');
           runTcBtn.addEventListener('click', function () {
@@ -664,7 +702,6 @@ async function renderTestCases(filterUcId) {
 
   // Sync with background to see if any are currently running
   syncActiveTests();
-  // Poll active tests every 2 seconds to keep the popup UI fresh
   if (!window.syncInterval) {
     window.syncInterval = setInterval(syncActiveTests, 2000);
   }
@@ -738,7 +775,6 @@ window.runAllTests = async function (ucId) {
   const buttonSelector = document.getElementById('buttonSelector').value;
   const responseSelector = document.getElementById('responseSelector').value;
   const testSuiteId = document.getElementById('testSuiteSelector').value;
-  const globalHumanFeedback = document.getElementById('globalHumanFeedback').value;
   const confirmButtonSelector = document.getElementById('confirmButtonSelector').value;
 
   if (!inputSelector || !buttonSelector) {
@@ -768,13 +804,75 @@ window.runAllTests = async function (ucId) {
       tabId: tab.id,
       testCases: tcs,
       backendUrl, apiKey, inputSelector, buttonSelector, responseSelector,
-      testSuiteId, globalHumanFeedback, confirmButtonSelector
+      testSuiteId, confirmButtonSelector
     };
 
     chrome.runtime.sendMessage({ action: 'startAllFunctionalTests', config }, (response) => {
       if (!response || !response.success) {
         allBtns.forEach(btn => btn.disabled = false);
         alert("Failed to start batch tests: " + (response?.error || 'Unknown error'));
+      }
+    });
+  } catch (e) {
+    allBtns.forEach(btn => btn.disabled = false);
+    alert(e.message);
+  }
+};
+
+window.runSelectedTests = async function (filterUcId = null) {
+  const container = document.getElementById('testCasesContainer');
+  let checkedBoxes = Array.from(container.querySelectorAll('.tc-checkbox:checked'));
+
+  if (filterUcId) {
+    checkedBoxes = checkedBoxes.filter(cb => cb.dataset.ucId === String(filterUcId));
+  }
+
+  if (checkedBoxes.length === 0) {
+    alert('No test cases selected. Please check one or more test cases to run.');
+    return;
+  }
+
+  const selectedIds = checkedBoxes.map(cb => cb.dataset.tcId);
+  const tcs = pendingTestCases.filter(t => selectedIds.includes(String(t.id)));
+  if (tcs.length === 0) return;
+
+  const backendUrl = document.getElementById('backendUrl').value;
+  const apiKey = document.getElementById('apiKey').value;
+  const inputSelector = document.getElementById('inputSelector').value;
+  const buttonSelector = document.getElementById('buttonSelector').value;
+  const responseSelector = document.getElementById('responseSelector').value;
+  const testSuiteId = document.getElementById('testSuiteSelector').value;
+  const confirmButtonSelector = document.getElementById('confirmButtonSelector').value;
+
+  if (!inputSelector || !buttonSelector) {
+    alert('Please set up the target selectors first in Target Detection!');
+    return;
+  }
+
+  const allBtns = document.querySelectorAll('.run-tc-btn, .run-all-btn, .run-selected-uc-btn');
+  allBtns.forEach(btn => btn.disabled = true);
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    for (const tc of tcs) {
+      const statusEl = document.getElementById(`tc-${tc.id}`)?.querySelector('.tc-status');
+      const badgeEl = document.getElementById(`tc-${tc.id}`)?.querySelector('.tc-status-badge');
+      if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = 'var(--text-secondary)'; statusEl.textContent = 'Queued...'; }
+      if (badgeEl) { badgeEl.textContent = 'Pending'; badgeEl.style.background = 'transparent'; badgeEl.style.color = 'var(--text-secondary)'; }
+    }
+
+    const config = {
+      tabId: tab.id,
+      testCases: tcs,
+      backendUrl, apiKey, inputSelector, buttonSelector, responseSelector,
+      testSuiteId, confirmButtonSelector
+    };
+
+    chrome.runtime.sendMessage({ action: 'startAllFunctionalTests', config }, (response) => {
+      if (!response || !response.success) {
+        allBtns.forEach(btn => btn.disabled = false);
+        alert('Failed to start selected tests: ' + (response?.error || 'Unknown error'));
       }
     });
   } catch (e) {
@@ -793,7 +891,6 @@ window.runFunctionalTest = async function (tcId, btnElement, isBatch = false) {
   const buttonSelector = document.getElementById('buttonSelector').value;
   const responseSelector = document.getElementById('responseSelector').value;
   const testSuiteId = document.getElementById('testSuiteSelector').value;
-  const globalHumanFeedback = document.getElementById('globalHumanFeedback').value;
   const confirmButtonSelector = document.getElementById('confirmButtonSelector').value;
 
   if (!inputSelector || !buttonSelector) {
@@ -828,7 +925,7 @@ window.runFunctionalTest = async function (tcId, btnElement, isBatch = false) {
     const config = {
       tabId: tab.id,
       tc, backendUrl, apiKey, inputSelector, buttonSelector, responseSelector,
-      testSuiteId, globalHumanFeedback, confirmButtonSelector
+      testSuiteId, confirmButtonSelector
     };
 
     chrome.runtime.sendMessage({ action: 'startFunctionalTest', config }, (response) => {
